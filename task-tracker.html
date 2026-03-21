@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<title>Tasks</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0a;color:#e0e0d8;font-family:'Courier New',Courier,monospace;min-height:100vh;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+button{cursor:pointer;border:none;outline:none;font-family:inherit;background:transparent}
+input{font-family:inherit;outline:none;color:#e0e0d8}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.3)}
+#header{position:sticky;top:0;z-index:10;background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:14px 16px 0}
+#header-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+#title{font-size:20px;letter-spacing:4px;font-weight:bold}
+#date-label{font-size:10px;color:#333;letter-spacing:1px}
+#tabs{display:flex;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+.tab{padding:8px 13px;font-size:10px;letter-spacing:1px;font-weight:bold;border-radius:4px 4px 0 0;white-space:nowrap;flex-shrink:0;font-family:inherit}
+#list{padding:4px 0 90px}
+.sec-hdr{padding:10px 16px 6px;font-size:9px;letter-spacing:3px;font-weight:bold;border-bottom:1px solid}
+.task-row{display:flex;border-bottom:1px solid #141414}
+.stripe{width:4px;flex-shrink:0}
+.task-body{flex:1;min-width:0;padding:11px 10px 11px 12px;display:flex;align-items:center;gap:10px}
+.task-text{flex:1;min-width:0}
+.task-name{font-size:13px;color:#ddd;line-height:1.4;word-break:break-word}
+.task-name.big{font-size:15px}
+.task-meta{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center}
+.task-btns{display:flex;gap:5px;flex-shrink:0}
+.btn-done{padding:6px 10px;border-radius:4px;font-size:11px;font-weight:bold;font-family:inherit}
+.btn-pin{padding:6px 8px;border-radius:4px;font-size:12px;border:1px solid #1c1c1c}
+.btn-del{padding:6px 8px;border-radius:4px;font-size:13px;border:1px solid #1c1c1c;color:#2a2a2a}
+.empty{text-align:center;padding:60px 20px;color:#222;font-size:13px}
+.footer-note{padding:8px 16px;font-size:9px;color:#252525;letter-spacing:1px;text-align:center}
+#fab{position:fixed;bottom:24px;right:20px;width:54px;height:54px;border-radius:50%;background:#e0e0d8;color:#0a0a0a;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.7);z-index:50;line-height:1}
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:flex-end;justify-content:center;z-index:100}
+#overlay.open{display:flex}
+#modal{background:#0e0e0e;border-top:1px solid #252525;width:100%;max-width:600px;padding:24px 20px 44px;border-radius:16px 16px 0 0;max-height:92vh;overflow-y:auto}
+.modal-title{font-size:20px;letter-spacing:4px;font-weight:bold;margin-bottom:18px;color:#e0e0d8}
+.inp{width:100%;background:#161616;border:1px solid #252525;padding:11px 12px;border-radius:6px;font-size:14px;font-family:inherit;color:#e0e0d8;margin-bottom:10px;display:block}
+.inp-row{display:flex;gap:8px;margin-bottom:10px}
+.inp-row .inp{margin-bottom:0;flex:1}
+#ai-btn{padding:11px 14px;border:1px solid #2a2a50;border-radius:6px;font-size:11px;white-space:nowrap;min-width:60px;font-family:inherit;background:#111;color:#8899cc}
+#ai-suggest-result{padding:9px 12px;margin-bottom:10px;border-radius:6px;font-size:11px;display:none;gap:8px;align-items:center}
+#ai-suggest-err{font-size:11px;color:#ff4455;margin-bottom:10px;display:none}
+#plabel{font-size:9px;letter-spacing:2px;color:#333;margin-bottom:6px}
+#pbtns{display:flex;gap:6px;margin-bottom:20px}
+.pbtn{flex:1;padding:9px 4px;border-radius:5px;font-size:11px;font-family:inherit;border:1px solid #1e1e1e;color:#333;font-weight:bold}
+#modal-actions{display:flex;gap:8px}
+#cancel-btn{flex:1;padding:13px;border:1px solid #252525;color:#555;border-radius:6px;font-size:12px;letter-spacing:1px}
+#save-btn{flex:2;padding:13px;border-radius:6px;font-size:12px;letter-spacing:1px;font-weight:bold;background:#1a1a1a;color:#333}
+</style>
+</head>
+<body>
+<div id="header">
+  <div id="header-top">
+    <div id="title">TASKS</div>
+    <div id="date-label"></div>
+  </div>
+  <div id="tabs"></div>
+</div>
+<div id="list"></div>
+<button id="fab">+</button>
+<div id="overlay">
+  <div id="modal">
+    <div class="modal-title">ADD TASK</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="inp-name" class="inp" style="margin-bottom:0;flex:1" placeholder="Task name *"/>
+      <button id="ai-btn">AI</button>
+    </div>
+    <div id="ai-suggest-result"></div>
+    <div id="ai-suggest-err"></div>
+    <div class="inp-row">
+      <input id="inp-recur" class="inp" type="number" placeholder="Repeats every N days"/>
+      <input id="inp-due" class="inp" type="date"/>
+    </div>
+    <input id="inp-notes" class="inp" placeholder="Notes (optional)"/>
+    <div id="plabel">TAP AI OR PICK MANUALLY</div>
+    <div id="pbtns">
+      <button class="pbtn" data-p="1">P1</button>
+      <button class="pbtn" data-p="2">P2</button>
+      <button class="pbtn" data-p="3">P3</button>
+      <button class="pbtn" data-p="4">P4</button>
+    </div>
+    <div id="modal-actions">
+      <button id="cancel-btn">CANCEL</button>
+      <button id="save-btn">ADD TASK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── config — UPDATE THIS after deploying your Worker ─────────────────────────
+var WORKER_URL = "PASTE_YOUR_WORKER_URL_HERE";
+
+// ── constants ─────────────────────────────────────────────────────────────────
+var C = {
+  1:{color:"#ff4455",bg:"rgba(255,68,85,0.13)",  label:"URGENT + IMPORTANT"},
+  2:{color:"#ffaa33",bg:"rgba(255,170,51,0.13)",  label:"IMPORTANT"},
+  3:{color:"#33ddaa",bg:"rgba(51,221,170,0.13)",  label:"URGENT"},
+  4:{color:"#5566aa",bg:"rgba(85,102,170,0.11)",  label:"NEITHER"}
+};
+
+// ── context — updated by Claude when relevant ─────────────────────────────────
+var CONTEXT = [
+  "Ta has ADHD and is a busy parent of an 11-year-old child.",
+  "Ta has two cats: Sigga (male, chronic kidney disease - needs daily medicine every day without fail) and Alice (female, due for annual vet visit).",
+  "Ta has a partner.",
+  "Ta lives in Gresham, Oregon.",
+  "UPCOMING: Son's birthday party is on 2026-03-21 (tomorrow). Party favors have been bought. Goodie bags still need to be packed today.",
+  "HEALTH: Ta follows a weekly at-home laser treatment (currently 3 days overdue) and a twice-weekly shower schedule.",
+  "RECURRING DAILY: Give Sigga medicine, hand wash dishes, do laundry, wipe kitchen table.",
+  "IMPORTANT PROJECTS: Bankruptcy paperwork (large multi-step project - not a quick daily task), disability application, taxes due April 15.",
+].join(" ");
+
+// ── initial tasks (used only if Worker has no data yet) ───────────────────────
+var INITIAL = [
+  {id:"1",  name:"Bankruptcy paperwork",            bp:1, rec:null, ld:null,         dd:"2026-03-13", notes:"Overdue",                   done:false},
+  {id:"2",  name:"Submit disability application",   bp:1, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"3",  name:"Library return",                  bp:1, rec:null, ld:null,         dd:"2026-03-16", notes:"No late fees",              done:false},
+  {id:"4",  name:"File taxes",                      bp:1, rec:null, ld:null,         dd:"2026-04-15", notes:"",                          done:false},
+  {id:"5",  name:"Give Sigga daily medicine",       bp:1, rec:1,    ld:"2026-03-19", dd:null,         notes:"",                          done:false},
+  {id:"6",  name:"Give Sigga flea medicine",        bp:1, rec:30,   ld:"2026-03-17", dd:null,         notes:"Monthly",                   done:false},
+  {id:"7",  name:"Give Sigga nausea medicine",      bp:1, rec:2,    ld:"2026-03-19", dd:null,         notes:"Every 2 days",              done:false},
+  {id:"8",  name:"Make vet appt for Alice",         bp:1, rec:null, ld:null,         dd:null,         notes:"Overdue annual",            done:false},
+  {id:"9",  name:"Reply to Portland Mental Health", bp:1, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"10", name:"Choose hormone specialist",       bp:1, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"11", name:"Contact couples therapists",      bp:1, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"12", name:"Start sleep journal",             bp:1, rec:null, ld:null,         dd:null,         notes:"Therapy homework",          done:false},
+  {id:"13", name:"Go to Competition Paint",         bp:1, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"14", name:"Empty automatic litter box",      bp:1, rec:3,    ld:"2026-03-19", dd:null,         notes:"Overflows if late",         done:false},
+  {id:"15", name:"Clean bathroom sink",             bp:1, rec:7,    ld:"2026-02-23", dd:null,         notes:"",                          done:false},
+  {id:"16", name:"Wipe dining table",               bp:1, rec:7,    ld:"2026-02-24", dd:null,         notes:"",                          done:false},
+  {id:"17", name:"Sweep downstairs",                bp:1, rec:7,    ld:"2026-02-24", dd:null,         notes:"",                          done:false},
+  {id:"18", name:"Clean cat feeders",               bp:1, rec:7,    ld:"2026-02-26", dd:null,         notes:"",                          done:false},
+  {id:"19", name:"Change my sheets",                bp:1, rec:14,   ld:"2026-02-19", dd:null,         notes:"",                          done:false},
+  {id:"20", name:"Buy party favors",                bp:1, rec:null, ld:null,         dd:"2026-03-21", notes:"Son's birthday Sat",        done:true},
+  {id:"21", name:"Pack goodie bags",                bp:1, rec:null, ld:null,         dd:"2026-03-21", notes:"Party tomorrow!",           done:false},
+  {id:"22", name:"Cancel kids dentist appt",        bp:1, rec:null, ld:null,         dd:"2026-03-28", notes:"Switching dentists",        done:false},
+  {id:"23", name:"Schedule eye exam (Ta + Kevin)",  bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"24", name:"Schedule dentist",                bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"25", name:"Find new dentist for kids",       bp:2, rec:null, ld:null,         dd:null,         notes:"Cancel current appt first", done:false},
+  {id:"26", name:"Find a plastic surgeon",          bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"27", name:"Research Brilliant",              bp:2, rec:null, ld:null,         dd:null,         notes:"Child education",           done:false},
+  {id:"28", name:"Register for Science is Weird",   bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"29", name:"Schedule HVAC maintenance",       bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"30", name:"Work through emails",             bp:2, rec:null, ld:null,         dd:null,         notes:"Inbox zero",                done:false},
+  {id:"31", name:"Get office window fixed",         bp:2, rec:null, ld:null,         dd:null,         notes:"Outer glass only",          done:false},
+  {id:"32", name:"Replace bathroom light bulb",     bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"33", name:"Change air purifier filter",      bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"34", name:"Take Sigga for a walk",           bp:2, rec:1,    ld:"2026-03-18", dd:null,         notes:"Daily",                     done:false},
+  {id:"35", name:"Water plants",                    bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"36", name:"Feed worms",                      bp:2, rec:null, ld:null,         dd:null,         notes:"Compost",                   done:false},
+  {id:"37", name:"Trim kids nails",                 bp:2, rec:14,   ld:"2026-03-05", dd:null,         notes:"",                          done:false},
+  {id:"38", name:"Get a haircut",                   bp:2, rec:42,   ld:"2026-02-01", dd:null,         notes:"Every 6 weeks",             done:false},
+  {id:"39", name:"Do laundry",                      bp:2, rec:1,    ld:"2026-03-19", dd:null,         notes:"Daily",                     done:false},
+  {id:"40", name:"Hand wash dishes",                bp:2, rec:1,    ld:"2026-03-19", dd:null,         notes:"Daily",                     done:false},
+  {id:"41", name:"At-home laser treatment",         bp:2, rec:7,    ld:"2026-03-10", dd:null,         notes:"Weekly",                    done:false},
+  {id:"42", name:"Clean toilet",                    bp:2, rec:7,    ld:"2026-03-12", dd:null,         notes:"Weekly",                    done:false},
+  {id:"43", name:"Wipe kitchen table",              bp:2, rec:1,    ld:"2026-03-18", dd:null,         notes:"Daily",                     done:false},
+  {id:"44", name:"Clean bathtub",                   bp:2, rec:14,   ld:"2026-03-05", dd:null,         notes:"",                          done:false},
+  {id:"45", name:"Wash sofa covers",                bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"46", name:"Wash litter box",                 bp:2, rec:7,    ld:"2026-03-12", dd:null,         notes:"",                          done:false},
+  {id:"47", name:"Post items online",               bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"48", name:"Buy Ikea Kallax for kids books",  bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"49", name:"Go to Costco",                    bp:2, rec:null, ld:null,         dd:"2026-03-28", notes:"",                          done:false},
+  {id:"50", name:"Read Sharry's book",              bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"51", name:"Call Spongie",                    bp:2, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"52", name:"Take a shower",                   bp:2, rec:2,    ld:"2026-03-19", dd:null,         notes:"Every 2 days",              done:false},
+  {id:"54", name:"Call fridge repair",              bp:3, rec:null, ld:null,         dd:null,         notes:"Light out",                 done:false},
+  {id:"55", name:"Get new glass recycling bin",     bp:3, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"56", name:"Reply to birthday invitation",    bp:3, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"57", name:"Make thank you cards with kids",  bp:3, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"58", name:"Call bowling alley",              bp:3, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"59", name:"Go to Trader Joe's",              bp:3, rec:null, ld:null,         dd:null,         notes:"Errand",                    done:false},
+  {id:"60", name:"Take rug to laundromat",          bp:3, rec:null, ld:null,         dd:null,         notes:"Errand",                    done:false},
+  {id:"61", name:"Drop off clothes donations",      bp:3, rec:null, ld:null,         dd:null,         notes:"Errand",                    done:false},
+  {id:"62", name:"Open mail",                       bp:3, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"63", name:"Bleach and tone my hair",         bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"64", name:"Marie Kondo my tops",             bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"65", name:"Clear the dresser",               bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"66", name:"Clear clutter off nightstand",    bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"67", name:"Vacuum the car",                  bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"68", name:"Clean inside of car windshield",  bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"69", name:"Deodorize Fox's boots",           bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"70", name:"Buy silicone whisk",              bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"71", name:"Buy pendant lamps",               bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"72", name:"Buy shelf liner",                 bp:4, rec:null, ld:null,         dd:null,         notes:"",                          done:false},
+  {id:"73", name:"Pick up replacement bed slat",    bp:4, rec:null, ld:null,         dd:null,         notes:"Ikea",                      done:false},
+  {id:"74", name:"Put on new mattress pad",         bp:2, rec:null, ld:null,         dd:null,         notes:"For pain relief",           done:false}
+];
+
+// ── state ─────────────────────────────────────────────────────────────────────
+var tasks = [];
+var view = "today";
+var selP = null;
+var aiPickIds = null;
+var pinnedByUser = [];
+
+// ── Worker API ────────────────────────────────────────────────────────────────
+async function apiGet(path) {
+  var res = await fetch(WORKER_URL + path);
+  return res.json();
+}
+async function apiPut(path, data) {
+  await fetch(WORKER_URL + path, {
+    method: "PUT",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data)
+  });
+}
+async function apiPost(path, data) {
+  var res = await fetch(WORKER_URL + path, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+// ── load / save ───────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    var [tr, pr] = await Promise.all([apiGet("/tasks"), apiGet("/pinned")]);
+    tasks = tr.tasks || JSON.parse(JSON.stringify(INITIAL));
+    pinnedByUser = pr.pinned || [];
+    // If no tasks in Worker yet, seed with initial data
+    if (!tr.tasks) await apiPut("/tasks", {tasks: tasks});
+  } catch(e) {
+    tasks = JSON.parse(JSON.stringify(INITIAL));
+    pinnedByUser = [];
+  }
+}
+async function saveTasks() {
+  try { await apiPut("/tasks", {tasks: tasks}); } catch(e) {}
+}
+async function savePinned() {
+  try { await apiPut("/pinned", {pinned: pinnedByUser}); } catch(e) {}
+}
+
+// ── date helpers ──────────────────────────────────────────────────────────────
+function getNextDue(t) {
+  if (t.rec != null && t.ld) {
+    var d = new Date(t.ld + "T12:00:00");
+    d.setDate(d.getDate() + t.rec);
+    return d;
+  }
+  if (t.rec != null && !t.ld) return new Date();
+  if (t.dd) return new Date(t.dd + "T12:00:00");
+  return null;
+}
+function daysUntil(t) {
+  var nd = getNextDue(t);
+  if (!nd) return null;
+  var today = new Date(); today.setHours(12,0,0,0);
+  return Math.round((nd - today) / 86400000);
+}
+function computeP(t) {
+  var d = daysUntil(t);
+  if (d !== null && d <= 0) return 1;
+  return t.bp;
+}
+function dueStr(t) {
+  var d = daysUntil(t);
+  if (d === null) return null;
+  if (d < 0) return Math.abs(d) + "d overdue";
+  if (d === 0) return "due today";
+  if (d === 1) return "tomorrow";
+  if (d <= 14) return "in " + d + "d";
+  var nd = getNextDue(t);
+  return nd.toLocaleDateString("en-US", {month:"short", day:"numeric"});
+}
+function getSorted() {
+  return tasks
+    .filter(function(t) { return !t.done; })
+    .map(function(t) { return Object.assign({}, t, {priority: computeP(t)}); })
+    .sort(function(a,b) { return a.priority - b.priority || a.name.localeCompare(b.name); });
+}
+function buildTaskList() {
+  return getSorted().map(function(t) {
+    var d = daysUntil(t);
+    var ds = d === null ? "" : d < 0 ? " (" + Math.abs(d) + "d overdue)" : d === 0 ? " (due today)" : d === 1 ? " (tomorrow)" : " (in " + d + "d)";
+    return "ID:" + t.id + " [P" + t.priority + "] " + t.name +
+      (t.rec ? " (every " + t.rec + "d, last:" + (t.ld||"never") + ")" : "") +
+      (t.dd ? " (due:" + t.dd + ")" : "") + ds;
+  }).join("\n");
+}
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+async function fetchAITop3() {
+  var today = new Date().toISOString().split("T")[0];
+  var data = await apiPost("/top3", {
+    taskList: buildTaskList(),
+    today: today,
+    context: CONTEXT
+  });
+  return data.ids;
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function render() {
+  var s = getSorted();
+  var counts = [1,2,3,4].map(function(p) { return s.filter(function(t) { return t.priority === p; }).length; });
+
+  document.getElementById("date-label").textContent =
+    new Date().toLocaleDateString("en-US", {month:"short", day:"numeric", year:"numeric"}).toUpperCase();
+
+  var tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = "";
+  [{id:"today",label:"TODAY",color:"#ff4455"},
+   {id:"all",  label:"ALL",  color:"#e0e0d8"},
+   {id:"1",    label:"P1 "+counts[0], color:"#ff4455"},
+   {id:"2",    label:"P2 "+counts[1], color:"#ffaa33"},
+   {id:"3",    label:"P3 "+counts[2], color:"#33ddaa"},
+   {id:"4",    label:"P4 "+counts[3], color:"#5566aa"}
+  ].forEach(function(tab) {
+    var btn = document.createElement("button");
+    btn.className = "tab"; btn.textContent = tab.label;
+    var a = view === tab.id;
+    btn.style.background = a ? tab.color : "transparent";
+    btn.style.color = a ? "#0a0a0a" : tab.color;
+    btn.style.border = "1px solid " + (a ? tab.color : "#1e1e1e");
+    btn.style.borderBottom = a ? "2px solid " + tab.color : "1px solid #0a0a0a";
+    btn.onclick = function() { view = tab.id; render(); };
+    tabsEl.appendChild(btn);
+  });
+
+  var listEl = document.getElementById("list");
+  listEl.innerHTML = "";
+
+  if (view === "today") {
+    renderToday(listEl, s);
+  } else if (view === "all") {
+    [1,2,3,4].forEach(function(p) {
+      var pt = s.filter(function(t) { return t.priority === p; });
+      if (!pt.length) return;
+      listEl.appendChild(mkHdr(C[p].label + " — " + pt.length, C[p].color));
+      pt.forEach(function(t) { listEl.appendChild(mkRow(t, false)); });
+    });
+  } else {
+    var pn = Number(view);
+    var pt = s.filter(function(t) { return t.priority === pn; });
+    listEl.appendChild(mkHdr(C[pn].label + " — " + pt.length, C[pn].color));
+    if (!pt.length) listEl.appendChild(mkEmpty("nothing here"));
+    else pt.forEach(function(t) { listEl.appendChild(mkRow(t, false)); });
+  }
+}
+
+function renderToday(listEl, s) {
+  listEl.appendChild(mkHdr("YOUR 3 TASKS FOR TODAY", "#ff4455"));
+
+  if (aiPickIds === null) {
+    var loading = document.createElement("div");
+    loading.style.cssText = "padding:24px 16px;font-size:10px;color:#2a2a2a;letter-spacing:2px;text-align:center";
+    loading.textContent = "AI is choosing your tasks...";
+    listEl.appendChild(loading);
+    return;
+  }
+
+  // User pinned tasks first
+  var userPinned = pinnedByUser.map(function(id) {
+    return s.find(function(t) { return t.id === id; });
+  }).filter(Boolean);
+
+  var picks;
+  if (aiPickIds.length > 0) {
+    var aiPicks = aiPickIds.map(function(id) {
+      return s.find(function(t) { return t.id === id; });
+    }).filter(Boolean);
+    var merged = userPinned.slice();
+    aiPicks.forEach(function(t) {
+      if (!merged.find(function(x) { return x.id === t.id; })) merged.push(t);
+    });
+    picks = merged.slice(0, 3);
+  } else {
+    var scored = s.map(function(t) {
+      var score = 0; var d = daysUntil(t);
+      if (t.rec === 1) score += 80;
+      if (d !== null && d < 0) score += Math.abs(d) * 15;
+      if (d === 0) score += 40;
+      if (d === 1) score += 20;
+      if (d === 2 || d === 3) score += 10;
+      if (t.rec && t.rec > 1 && d !== null && d <= 0) score += 30;
+      if (t.priority === 1) score += 50;
+      return Object.assign({}, t, {score: score});
+    }).sort(function(a,b) { return b.score - a.score; });
+    var fallback = userPinned.slice();
+    scored.forEach(function(t) {
+      if (!fallback.find(function(x) { return x.id === t.id; })) fallback.push(t);
+    });
+    picks = fallback.slice(0, 3);
+  }
+
+  if (!picks.length) {
+    listEl.appendChild(mkEmpty("nothing urgent right now"));
+  } else {
+    picks.forEach(function(t) { listEl.appendChild(mkRow(t, true)); });
+  }
+
+  var p1count = s.filter(function(t) { return t.priority === 1; }).length;
+  if (p1count > 3) {
+    var more = document.createElement("div");
+    more.style.cssText = "padding:12px 16px;font-size:10px;color:#2a2a2a;letter-spacing:1px;text-align:center;border-top:1px solid #141414";
+    more.textContent = "+ " + (p1count - 3) + " more urgent — tap P1";
+    listEl.appendChild(more);
+  }
+  if (aiPickIds.length > 0) {
+    var badge = document.createElement("div");
+    badge.className = "footer-note";
+    badge.textContent = "chosen by AI";
+    listEl.appendChild(badge);
+  }
+}
+
+function mkHdr(text, color) {
+  var el = document.createElement("div");
+  el.className = "sec-hdr";
+  el.style.color = color;
+  el.style.borderBottomColor = color + "22";
+  el.textContent = text;
+  return el;
+}
+function mkEmpty(text) {
+  var el = document.createElement("div");
+  el.className = "empty";
+  el.textContent = text;
+  return el;
+}
+function mkRow(t, big) {
+  var p = C[t.priority];
+  var due = dueStr(t);
+  var ov = due && due.indexOf("overdue") >= 0;
+  var tod = due === "due today";
+
+  var row = document.createElement("div"); row.className = "task-row";
+  var stripe = document.createElement("div"); stripe.className = "stripe"; stripe.style.background = p.color;
+  var body = document.createElement("div"); body.className = "task-body";
+  var txt = document.createElement("div"); txt.className = "task-text";
+  var nm = document.createElement("div");
+  nm.className = big ? "task-name big" : "task-name";
+  nm.textContent = t.name;
+  var meta = document.createElement("div"); meta.className = "task-meta";
+
+  if (due) {
+    var ds = document.createElement("span");
+    ds.style.cssText = "font-size:10px;font-weight:bold;color:" + (ov ? "#ff4455" : tod ? "#ffaa33" : "#555");
+    ds.textContent = due; meta.appendChild(ds);
+  }
+  if (t.rec) {
+    var rs = document.createElement("span");
+    rs.style.cssText = "font-size:10px;color:#2a2a2a";
+    rs.textContent = "every " + t.rec + "d"; meta.appendChild(rs);
+  }
+  if (t.notes) {
+    var ns = document.createElement("span");
+    ns.style.cssText = "font-size:10px;color:#2a2a2a;font-style:italic";
+    ns.textContent = t.notes; meta.appendChild(ns);
+  }
+
+  txt.appendChild(nm); txt.appendChild(meta);
+
+  var btns = document.createElement("div"); btns.className = "task-btns";
+
+  // pin button
+  var isPinned = pinnedByUser.indexOf(t.id) !== -1;
+  var pin = document.createElement("button"); pin.className = "btn-pin";
+  pin.textContent = isPinned ? "★" : "☆";
+  pin.style.color = isPinned ? "#ffaa33" : "#2a2a2a";
+  pin.onclick = function() {
+    if (pinnedByUser.indexOf(t.id) !== -1) {
+      pinnedByUser = pinnedByUser.filter(function(id) { return id !== t.id; });
+    } else {
+      pinnedByUser.push(t.id);
+    }
+    savePinned(); render();
+  };
+
+  // done button
+  var db = document.createElement("button"); db.className = "btn-done";
+  db.textContent = "DONE";
+  db.style.cssText = "background:" + p.bg + ";color:" + p.color + ";border:1px solid " + p.color + "44";
+  if (big) db.style.padding = "8px 14px";
+  db.onclick = function() {
+    var today = new Date().toISOString().split("T")[0];
+    var idx = tasks.findIndex(function(x) { return x.id === t.id; });
+    if (idx === -1) return;
+    if (tasks[idx].rec != null) tasks[idx].ld = today;
+    else tasks[idx].done = true;
+    saveTasks();
+    aiPickIds = null;
+    render();
+    refreshAI();
+  };
+
+  // delete button
+  var del = document.createElement("button"); del.className = "btn-del"; del.textContent = "x";
+  del.onclick = function() {
+    if (confirm('Delete "' + t.name + '"?')) {
+      tasks = tasks.filter(function(x) { return x.id !== t.id; });
+      saveTasks(); render();
+    }
+  };
+
+  btns.appendChild(pin); btns.appendChild(db); btns.appendChild(del);
+  body.appendChild(txt); body.appendChild(btns);
+  row.appendChild(stripe); row.appendChild(body);
+  return row;
+}
+
+// ── modal ─────────────────────────────────────────────────────────────────────
+function openModal() {
+  selP = null;
+  ["inp-name","inp-recur","inp-due","inp-notes"].forEach(function(id) { document.getElementById(id).value = ""; });
+  document.getElementById("ai-suggest-result").style.display = "none";
+  document.getElementById("ai-suggest-err").style.display = "none";
+  document.getElementById("plabel").textContent = "TAP AI OR PICK MANUALLY";
+  document.getElementById("save-btn").style.background = "#1a1a1a";
+  document.getElementById("save-btn").style.color = "#333";
+  updatePBtns();
+  document.getElementById("overlay").classList.add("open");
+  setTimeout(function() { document.getElementById("inp-name").focus(); }, 150);
+}
+function closeModal() { document.getElementById("overlay").classList.remove("open"); }
+function updatePBtns() {
+  document.querySelectorAll(".pbtn").forEach(function(btn) {
+    var p = parseInt(btn.dataset.p); var a = selP === p;
+    btn.style.background = a ? C[p].bg : "transparent";
+    btn.style.border = "1px solid " + (a ? C[p].color : "#1e1e1e");
+    btn.style.color = a ? C[p].color : "#333";
+  });
+  if (selP) {
+    document.getElementById("save-btn").style.background = C[selP].color;
+    document.getElementById("save-btn").style.color = "#0a0a0a";
+    document.getElementById("plabel").textContent = "PRIORITY — tap to change";
+  }
+}
+
+document.querySelectorAll(".pbtn").forEach(function(btn) {
+  btn.onclick = function() { selP = parseInt(btn.dataset.p); updatePBtns(); };
+});
+document.getElementById("fab").onclick = openModal;
+document.getElementById("cancel-btn").onclick = closeModal;
+document.getElementById("overlay").onclick = function(e) {
+  if (e.target === document.getElementById("overlay")) closeModal();
+};
+
+document.getElementById("ai-btn").onclick = async function() {
+  var name = document.getElementById("inp-name").value.trim();
+  if (!name) return;
+  var btn = document.getElementById("ai-btn");
+  btn.textContent = "..."; btn.disabled = true;
+  document.getElementById("ai-suggest-result").style.display = "none";
+  document.getElementById("ai-suggest-err").style.display = "none";
+  try {
+    var today = new Date().toISOString().split("T")[0];
+    var result = await apiPost("/suggest", {
+      name: name,
+      dueDate: document.getElementById("inp-due").value,
+      recurrenceDays: document.getElementById("inp-recur").value,
+      notes: document.getElementById("inp-notes").value,
+      today: today
+    });
+    selP = result.priority; updatePBtns();
+    var el = document.getElementById("ai-suggest-result");
+    el.style.display = "flex";
+    el.style.background = C[result.priority].bg;
+    el.style.border = "1px solid " + C[result.priority].color + "44";
+    el.style.color = C[result.priority].color;
+    el.innerHTML = "<strong>P" + result.priority + "</strong>&nbsp;<span style='color:#555'>—</span>&nbsp;<span style='color:#666'>" + result.reason + "</span>";
+  } catch(e) {
+    var err = document.getElementById("ai-suggest-err");
+    err.style.display = "block"; err.textContent = "Could not suggest priority. Pick manually.";
+  }
+  btn.textContent = "AI"; btn.disabled = false;
+};
+
+document.getElementById("save-btn").onclick = function() {
+  var name = document.getElementById("inp-name").value.trim();
+  if (!name || !selP) return;
+  tasks.push({
+    id: Date.now().toString(),
+    name: name,
+    bp: selP,
+    rec: document.getElementById("inp-recur").value ? parseInt(document.getElementById("inp-recur").value) : null,
+    ld: null,
+    dd: document.getElementById("inp-due").value || null,
+    notes: document.getElementById("inp-notes").value.trim(),
+    done: false
+  });
+  saveTasks(); closeModal(); render();
+};
+
+document.getElementById("inp-name").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") document.getElementById("ai-btn").click();
+});
+
+// ── init ──────────────────────────────────────────────────────────────────────
+function refreshAI() {
+  fetchAITop3().then(function(ids) {
+    aiPickIds = ids;
+    if (view === "today") render();
+  }).catch(function() {
+    aiPickIds = [];
+    if (view === "today") render();
+  });
+}
+
+// Show loading screen while fetching from Worker
+document.getElementById("list").innerHTML = '<div style="padding:40px 16px;font-size:10px;color:#2a2a2a;letter-spacing:2px;text-align:center">LOADING...</div>';
+
+loadAll().then(function() {
+  render();
+  refreshAI();
+}).catch(function() {
+  render();
+});
+</script>
+</body>
+</html>
