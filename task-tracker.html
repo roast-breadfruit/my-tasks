@@ -36,6 +36,9 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.3)}
 .footer-note{padding:8px 16px;font-size:9px;color:#252525;letter-spacing:1px;text-align:center}
 #fab{position:fixed;bottom:24px;right:20px;width:54px;height:54px;border-radius:50%;background:#e0e0d8;color:#0a0a0a;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 24px rgba(0,0,0,.7);z-index:50;line-height:1}
 #overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:flex-end;justify-content:center;z-index:100}
+#edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:flex-end;justify-content:center;z-index:101}
+#edit-overlay.open{display:flex}
+#edit-modal{background:#0e0e0e;border-top:1px solid #252525;width:100%;max-width:600px;padding:24px 20px 44px;border-radius:16px 16px 0 0;max-height:92vh;overflow-y:auto}
 #overlay.open{display:flex}
 #modal{background:#0e0e0e;border-top:1px solid #252525;width:100%;max-width:600px;padding:24px 20px 44px;border-radius:16px 16px 0 0;max-height:92vh;overflow-y:auto}
 .modal-title{font-size:20px;letter-spacing:4px;font-weight:bold;margin-bottom:18px;color:#e0e0d8}
@@ -74,9 +77,13 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.3)}
     <div id="ai-suggest-err"></div>
     <div class="inp-row">
       <input id="inp-recur" class="inp" type="number" placeholder="Repeats every N days"/>
-      <input id="inp-due" class="inp" type="date"/>
+      <input id="inp-due" class="inp" type="date" placeholder="Due date"/>
     </div>
     <input id="inp-notes" class="inp" placeholder="Notes (optional)"/>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <input type="checkbox" id="inp-project" style="width:18px;height:18px;accent-color:#cc88ff"/>
+      <label for="inp-project" style="font-size:12px;color:#888;letter-spacing:1px">MARK AS PROJECT</label>
+    </div>
     <div id="plabel">TAP AI OR PICK MANUALLY</div>
     <div id="pbtns">
       <button class="pbtn" data-p="1">P1</button>
@@ -87,6 +94,38 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.3)}
     <div id="modal-actions">
       <button id="cancel-btn">CANCEL</button>
       <button id="save-btn">ADD TASK</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-overlay">
+  <div id="edit-modal">
+    <div class="modal-title">EDIT TASK</div>
+    <input id="edit-name" class="inp" placeholder="Task name *"/>
+    <div class="inp-row">
+      <input id="edit-recur" class="inp" type="number" placeholder="Repeats every N days"/>
+      <input id="edit-due" class="inp" type="date"/>
+    </div>
+    <input id="edit-lastdone" class="inp" type="date" placeholder="Last done date"/>
+    <input id="edit-notes" class="inp" placeholder="Notes (optional)"/>
+    <div id="edit-plabel" style="font-size:9px;letter-spacing:2px;color:#333;margin-bottom:6px">PRIORITY</div>
+    <div id="edit-pbtns" style="display:flex;gap:6px;margin-bottom:16px">
+      <button class="pbtn" data-ep="1">P1</button>
+      <button class="pbtn" data-ep="2">P2</button>
+      <button class="pbtn" data-ep="3">P3</button>
+      <button class="pbtn" data-ep="4">P4</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <input type="checkbox" id="edit-project" style="width:18px;height:18px;accent-color:#cc88ff"/>
+      <label for="edit-project" style="font-size:12px;color:#888;letter-spacing:1px">PROJECT</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <input type="checkbox" id="edit-done" style="width:18px;height:18px;accent-color:#ff4455"/>
+      <label for="edit-done" style="font-size:12px;color:#888;letter-spacing:1px">MARK AS DONE</label>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="edit-cancel-btn" style="flex:1;padding:13px;border:1px solid #252525;color:#555;border-radius:6px;font-size:12px;letter-spacing:1px">CANCEL</button>
+      <button id="edit-save-btn" style="flex:2;padding:13px;border-radius:6px;font-size:12px;letter-spacing:1px;font-weight:bold;background:#e0e0d8;color:#0a0a0a;border:none">SAVE</button>
     </div>
   </div>
 </div>
@@ -194,7 +233,7 @@ var INITIAL = [
 
 // ── state ─────────────────────────────────────────────────────────────────────
 var tasks = [];
-var view = "today";
+var view = "focus";
 var selP = null;
 var aiPickIds = null;
 var pinnedByUser = [];
@@ -309,12 +348,13 @@ function render() {
 
   var tabsEl = document.getElementById("tabs");
   tabsEl.innerHTML = "";
-  [{id:"today",label:"TODAY",color:"#ff4455"},
-   {id:"all",  label:"ALL",  color:"#e0e0d8"},
-   {id:"1",    label:"P1 "+counts[0], color:"#ff4455"},
-   {id:"2",    label:"P2 "+counts[1], color:"#ffaa33"},
-   {id:"3",    label:"P3 "+counts[2], color:"#33ddaa"},
-   {id:"4",    label:"P4 "+counts[3], color:"#5566aa"}
+  [{id:"focus", label:"CURRENT PROJECT",    color:"#cc88ff"},
+   {id:"today", label:"TODAY",              color:"#ff4455"},
+   {id:"all",   label:"ALL",               color:"#e0e0d8"},
+   {id:"1",     label:"P1 "+counts[0],     color:"#ff4455"},
+   {id:"2",     label:"P2 "+counts[1],     color:"#ffaa33"},
+   {id:"3",     label:"P3 "+counts[2],     color:"#33ddaa"},
+   {id:"4",     label:"P4 "+counts[3],     color:"#5566aa"}
   ].forEach(function(tab) {
     var btn = document.createElement("button");
     btn.className = "tab"; btn.textContent = tab.label;
@@ -332,6 +372,8 @@ function render() {
 
   if (view === "today") {
     renderToday(listEl, s);
+  } else if (view === "focus") {
+    renderFocus(listEl, s);
   } else if (view === "all") {
     [1,2,3,4].forEach(function(p) {
       var pt = s.filter(function(t) { return t.priority === p; });
@@ -377,13 +419,22 @@ function renderToday(listEl, s) {
   } else {
     var scored = s.map(function(t) {
       var score = 0; var d = daysUntil(t);
-      if (t.rec === 1) score += 80;
-      if (d !== null && d < 0) score += Math.abs(d) * 15;
-      if (d === 0) score += 40;
-      if (d === 1) score += 20;
-      if (d === 2 || d === 3) score += 10;
-      if (t.rec && t.rec > 1 && d !== null && d <= 0) score += 30;
-      if (t.priority === 1) score += 50;
+      // Daily recurring tasks always float to top
+      if (t.rec === 1) score += 200;
+      // Tasks with fixed deadlines due very soon (not recurring - real events)
+      if (!t.rec && t.dd) {
+        if (d === 0) score += 180;
+        if (d === 1) score += 160;
+        if (d === 2) score += 100;
+        if (d === 3) score += 60;
+      }
+      // Recurring tasks due today
+      if (t.rec && d === 0) score += 100;
+      if (t.rec && d === 1) score += 60;
+      // Overdue recurring tasks - capped so they don't dominate over dailies/deadlines
+      if (t.rec && t.rec > 1 && d !== null && d < 0) score += Math.min(Math.abs(d) * 3, 40);
+      // Non-recurring overdue tasks - very low weight (likely big projects)
+      if (!t.rec && d !== null && d < 0) score += 10;
       return Object.assign({}, t, {score: score});
     }).sort(function(a,b) { return b.score - a.score; });
     var fallback = userPinned.slice();
@@ -414,6 +465,34 @@ function renderToday(listEl, s) {
   }
 }
 
+function renderFocus(listEl, s) {
+  listEl.appendChild(mkHdr("PROJECT TIME", "#cc88ff"));
+
+  // Only show tasks flagged as projects
+  var p2 = s.filter(function(t) { return t.project === true; });
+  var scored = p2.map(function(t) {
+    var score = 0; var d = daysUntil(t);
+    if (d !== null && d < 0) score += Math.abs(d) * 10;
+    if (d === 0) score += 100;
+    if (d === 1) score += 80;
+    if (d === 2 || d === 3) score += 50;
+    if (t.rec === 1) score += 60;
+    if (t.rec && t.rec > 1 && d !== null && d <= 0) score += 40;
+    return Object.assign({}, t, {score: score});
+  }).sort(function(a, b) { return b.score - a.score; });
+
+  var pick = scored[0];
+  if (!pick) {
+    listEl.appendChild(mkEmpty("no projects — mark tasks as projects to see them here"));
+  } else {
+    listEl.appendChild(mkRow(pick, true));
+    var note = document.createElement("div");
+    note.className = "footer-note";
+    note.textContent = "dedicate focused time to this today";
+    listEl.appendChild(note);
+  }
+}
+
 function mkHdr(text, color) {
   var el = document.createElement("div");
   el.className = "sec-hdr";
@@ -441,6 +520,8 @@ function mkRow(t, big) {
   var nm = document.createElement("div");
   nm.className = big ? "task-name big" : "task-name";
   nm.textContent = t.name;
+  nm.style.cursor = "pointer";
+  nm.onclick = function() { openEdit(t); };
   var meta = document.createElement("div"); meta.className = "task-meta";
 
   if (due) {
@@ -462,6 +543,22 @@ function mkRow(t, big) {
   txt.appendChild(nm); txt.appendChild(meta);
 
   var btns = document.createElement("div"); btns.className = "task-btns";
+
+  // project toggle button
+  var isProject = t.project === true;
+  var proj = document.createElement("button"); proj.className = "btn-pin";
+  proj.textContent = "P";
+  proj.style.color = isProject ? "#cc88ff" : "#2a2a2a";
+  proj.style.border = "1px solid " + (isProject ? "#cc88ff44" : "#1c1c1c");
+  proj.style.fontWeight = isProject ? "bold" : "normal";
+  proj.title = isProject ? "Remove project flag" : "Mark as project";
+  proj.onclick = function() {
+    var idx = tasks.findIndex(function(x) { return x.id === t.id; });
+    if (idx !== -1) {
+      tasks[idx].project = !tasks[idx].project;
+      saveTasks(); render();
+    }
+  };
 
   // pin button
   var isPinned = pinnedByUser.indexOf(t.id) !== -1;
@@ -503,7 +600,7 @@ function mkRow(t, big) {
     }
   };
 
-  btns.appendChild(pin); btns.appendChild(db); btns.appendChild(del);
+  btns.appendChild(proj); btns.appendChild(pin); btns.appendChild(db); btns.appendChild(del);
   body.appendChild(txt); body.appendChild(btns);
   row.appendChild(stripe); row.appendChild(body);
   return row;
@@ -519,6 +616,7 @@ function openModal() {
   document.getElementById("save-btn").style.background = "#1a1a1a";
   document.getElementById("save-btn").style.color = "#333";
   updatePBtns();
+  document.getElementById("inp-project").checked = false;
   document.getElementById("overlay").classList.add("open");
   setTimeout(function() { document.getElementById("inp-name").focus(); }, 150);
 }
@@ -587,6 +685,7 @@ document.getElementById("save-btn").onclick = function() {
     ld: null,
     dd: document.getElementById("inp-due").value || null,
     notes: document.getElementById("inp-notes").value.trim(),
+    project: document.getElementById("inp-project").checked,
     done: false
   });
   saveTasks(); closeModal(); render();
@@ -595,6 +694,63 @@ document.getElementById("save-btn").onclick = function() {
 document.getElementById("inp-name").addEventListener("keydown", function(e) {
   if (e.key === "Enter") document.getElementById("ai-btn").click();
 });
+
+// ── edit modal ────────────────────────────────────────────────────────────────
+var editingId = null;
+var editSelP = null;
+
+function openEdit(t) {
+  editingId = t.id;
+  editSelP = t.bp;
+  document.getElementById("edit-name").value = t.name;
+  document.getElementById("edit-recur").value = t.rec || "";
+  document.getElementById("edit-due").value = t.dd || "";
+  document.getElementById("edit-lastdone").value = t.ld || "";
+  document.getElementById("edit-notes").value = t.notes || "";
+  document.getElementById("edit-project").checked = t.project === true;
+  document.getElementById("edit-done").checked = t.done === true;
+  updateEditPBtns();
+  document.getElementById("edit-overlay").classList.add("open");
+}
+
+function closeEdit() {
+  document.getElementById("edit-overlay").classList.remove("open");
+  editingId = null;
+}
+
+function updateEditPBtns() {
+  document.querySelectorAll("[data-ep]").forEach(function(btn) {
+    var p = parseInt(btn.dataset.ep); var a = editSelP === p;
+    btn.style.background = a ? C[p].bg : "transparent";
+    btn.style.border = "1px solid " + (a ? C[p].color : "#1e1e1e");
+    btn.style.color = a ? C[p].color : "#333";
+  });
+}
+
+document.querySelectorAll("[data-ep]").forEach(function(btn) {
+  btn.onclick = function() { editSelP = parseInt(btn.dataset.ep); updateEditPBtns(); };
+});
+
+document.getElementById("edit-cancel-btn").onclick = closeEdit;
+document.getElementById("edit-overlay").onclick = function(e) {
+  if (e.target === document.getElementById("edit-overlay")) closeEdit();
+};
+
+document.getElementById("edit-save-btn").onclick = function() {
+  var name = document.getElementById("edit-name").value.trim();
+  if (!name || !editSelP) return;
+  var idx = tasks.findIndex(function(x) { return x.id === editingId; });
+  if (idx === -1) return;
+  tasks[idx].name = name;
+  tasks[idx].bp = editSelP;
+  tasks[idx].rec = document.getElementById("edit-recur").value ? parseInt(document.getElementById("edit-recur").value) : null;
+  tasks[idx].dd = document.getElementById("edit-due").value || null;
+  tasks[idx].ld = document.getElementById("edit-lastdone").value || null;
+  tasks[idx].notes = document.getElementById("edit-notes").value.trim();
+  tasks[idx].project = document.getElementById("edit-project").checked;
+  tasks[idx].done = document.getElementById("edit-done").checked;
+  saveTasks(); closeEdit(); render();
+};
 
 // ── init ──────────────────────────────────────────────────────────────────────
 function refreshAI() {
